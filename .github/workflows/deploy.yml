@@ -1,0 +1,56 @@
+name: Deploy
+
+on: push
+
+jobs:
+  create-release:
+    name: Create Release
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Create release
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: hub release create -d -m "Build ${{github.run_number}}" ${GITHUB_REF##*/}
+      
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        repository: sowaengine/sowa
+        
+    - name: Setup emscripten
+      uses: mymindstorm/setup-emsdk@v11
+      with:
+        version: 1.38.40
+    
+    - name: Check dependencies
+      run: |
+        emcc -v
+        printf ${{ env.EMSDK }}
+      
+    - name: Configure
+      run: |
+        mkdir build
+        cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=${{env.EMSDK}}
+    
+    - name: Build
+      run: |
+        cmake --build ${{github.workspace}}/build --config Release --parallel 4
+
+    - name: Package
+      shell: bash
+      working-directory: build
+      run: cpack
+
+    - name: "Upload release assets"
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        hub release edit $(find package/ -maxdepth 1 -type f -printf "-a %p " -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz") -m "" ${GITHUB_REF##*/}

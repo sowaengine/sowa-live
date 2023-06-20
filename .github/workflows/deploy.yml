@@ -29,17 +29,13 @@ jobs:
     - name: Setup emscripten
       uses: mymindstorm/setup-emsdk@v11
       with:
-        version: 1.38.40
-
-    - name: "Install Dependencies"
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake
-        sudo apt-get install -y libx11-dev
-        cmake --version
-    
+        version: 1.38.30
+        
     - name: Check dependencies
       run: |
+        python3 --version
+        python --version
+        cmake --version
         emcc -v
         printf ${{ env.EMSDK }}
         cat ${{env.EMSDK}}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake

@@ -41,24 +41,25 @@ jobs:
       run: |
         emcc -v
         printf ${{ env.EMSDK }}
+        cat ${{env.EMSDK}}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
       
-    - name: Configure
-      run: |
-        mkdir build
-        cmake -S . -B build -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=${{env.EMSDK}}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
-    
-    - name: Build
-      run: |
-        cmake --build ${{github.workspace}}/build --config Release --parallel 4
-
-    - name: Package
-      shell: bash
-      working-directory: build
-      run: cpack
-
-    - name: "Upload release assets"
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        hub release edit $(find package/ -maxdepth 1 -type f -printf "-a %p " -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz") -m "" ${GITHUB_REF##*/}
+    #- name: Configure
+    #  run: |
+    #    mkdir build
+    #    cmake -S . -B build -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=${{env.EMSDK}}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+    #
+    #- name: Build
+    #  run: |
+    #    cmake --build ${{github.workspace}}/build --config Release --parallel 4
+#
+    #- name: Package
+    #  shell: bash
+    #  working-directory: build
+    #  run: cpack
+#
+    #- name: "Upload release assets"
+    #  shell: bash
+    #  env:
+    #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #  run: |
+    #    hub release edit $(find package/ -maxdepth 1 -type f -printf "-a %p " -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz") -m "" ${GITHUB_REF##*/}

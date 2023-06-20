@@ -29,7 +29,7 @@ jobs:
     - name: Setup emscripten
       uses: mymindstorm/setup-emsdk@v11
       with:
-        version: 1.38.30
+        version: latest
         
     - name: Check dependencies
       run: |

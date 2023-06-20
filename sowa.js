@@ -1284,6 +1284,109 @@ var ASM_CONSTS = {
       }
     }
 
+  /** @constructor */
+  function ExceptionInfo(excPtr) {
+      this.excPtr = excPtr;
+      this.ptr = excPtr - 24;
+  
+      this.set_type = function(type) {
+        HEAPU32[(((this.ptr)+(4))>>2)] = type;
+      };
+  
+      this.get_type = function() {
+        return HEAPU32[(((this.ptr)+(4))>>2)];
+      };
+  
+      this.set_destructor = function(destructor) {
+        HEAPU32[(((this.ptr)+(8))>>2)] = destructor;
+      };
+  
+      this.get_destructor = function() {
+        return HEAPU32[(((this.ptr)+(8))>>2)];
+      };
+  
+      this.set_refcount = function(refcount) {
+        HEAP32[((this.ptr)>>2)] = refcount;
+      };
+  
+      this.set_caught = function (caught) {
+        caught = caught ? 1 : 0;
+        HEAP8[(((this.ptr)+(12))>>0)] = caught;
+      };
+  
+      this.get_caught = function () {
+        return HEAP8[(((this.ptr)+(12))>>0)] != 0;
+      };
+  
+      this.set_rethrown = function (rethrown) {
+        rethrown = rethrown ? 1 : 0;
+        HEAP8[(((this.ptr)+(13))>>0)] = rethrown;
+      };
+  
+      this.get_rethrown = function () {
+        return HEAP8[(((this.ptr)+(13))>>0)] != 0;
+      };
+  
+      // Initialize native structure fields. Should be called once after allocated.
+      this.init = function(type, destructor) {
+        this.set_adjusted_ptr(0);
+        this.set_type(type);
+        this.set_destructor(destructor);
+        this.set_refcount(0);
+        this.set_caught(false);
+        this.set_rethrown(false);
+      }
+  
+      this.add_ref = function() {
+        var value = HEAP32[((this.ptr)>>2)];
+        HEAP32[((this.ptr)>>2)] = value + 1;
+      };
+  
+      // Returns true if last reference released.
+      this.release_ref = function() {
+        var prev = HEAP32[((this.ptr)>>2)];
+        HEAP32[((this.ptr)>>2)] = prev - 1;
+        assert(prev > 0);
+        return prev === 1;
+      };
+  
+      this.set_adjusted_ptr = function(adjustedPtr) {
+        HEAPU32[(((this.ptr)+(16))>>2)] = adjustedPtr;
+      };
+  
+      this.get_adjusted_ptr = function() {
+        return HEAPU32[(((this.ptr)+(16))>>2)];
+      };
+  
+      // Get pointer which is expected to be received by catch clause in C++ code. It may be adjusted
+      // when the pointer is casted to some of the exception object base classes (e.g. when virtual
+      // inheritance is used). When a pointer is thrown this method should return the thrown pointer
+      // itself.
+      this.get_exception_ptr = function() {
+        // Work around a fastcomp bug, this code is still included for some reason in a build without
+        // exceptions support.
+        var isPointer = ___cxa_is_pointer_type(this.get_type());
+        if (isPointer) {
+          return HEAPU32[((this.excPtr)>>2)];
+        }
+        var adjusted = this.get_adjusted_ptr();
+        if (adjusted !== 0) return adjusted;
+        return this.excPtr;
+      };
+    }
+  
+  var exceptionLast = 0;
+  
+  var uncaughtExceptionCount = 0;
+  function ___cxa_throw(ptr, type, destructor) {
+      var info = new ExceptionInfo(ptr);
+      // Initialize ExceptionInfo content after it was allocated in __cxa_allocate_exception.
+      info.init(type, destructor);
+      exceptionLast = ptr;
+      uncaughtExceptionCount++;
+      throw ptr + " - Exception catching is disabled, this exception cannot be caught. Compile with -sNO_DISABLE_EXCEPTION_CATCHING or -sEXCEPTION_CATCHING_ALLOWED=[..] to catch.";
+    }
+
   function __embind_register_bigint(primitiveType, name, size, minRange, maxRange) {}
 
   function getShiftFromSize(size) {
@@ -5663,15 +5766,59 @@ var ASM_CONSTS = {
       return id;
     }
 
-  function _glDeleteShader(id) {
+  function _glDeleteBuffers(n, buffers) {
+      for (var i = 0; i < n; i++) {
+        var id = HEAP32[(((buffers)+(i*4))>>2)];
+        var buffer = GL.buffers[id];
+  
+        // From spec: "glDeleteBuffers silently ignores 0's and names that do not
+        // correspond to existing buffer objects."
+        if (!buffer) continue;
+  
+        GLctx.deleteBuffer(buffer);
+        buffer.name = 0;
+        GL.buffers[id] = null;
+  
+        if (id == GLctx.currentArrayBufferBinding) GLctx.currentArrayBufferBinding = 0;
+        if (id == GLctx.currentElementArrayBufferBinding) GLctx.currentElementArrayBufferBinding = 0;
+        if (id == GLctx.currentPixelPackBufferBinding) GLctx.currentPixelPackBufferBinding = 0;
+        if (id == GLctx.currentPixelUnpackBufferBinding) GLctx.currentPixelUnpackBufferBinding = 0;
+      }
+    }
+
+  function _glDeleteProgram(id) {
       if (!id) return;
-      var shader = GL.shaders[id];
-      if (!shader) { // glDeleteShader actually signals an error when deleting a nonexisting object, unlike some other GL delete functions.
+      var program = GL.programs[id];
+      if (!program) { // glDeleteProgram actually signals an error when deleting a nonexisting object, unlike some other GL delete functions.
         GL.recordError(0x501 /* GL_INVALID_VALUE */);
         return;
       }
-      GLctx.deleteShader(shader);
-      GL.shaders[id] = null;
+      GLctx.deleteProgram(program);
+      program.name = 0;
+      GL.programs[id] = null;
+    }
+
+  function _glDeleteVertexArrays(n, vaos) {
+      for (var i = 0; i < n; i++) {
+        var id = HEAP32[(((vaos)+(i*4))>>2)];
+        GLctx['deleteVertexArray'](GL.vaos[id]);
+        GL.vaos[id] = null;
+      }
+    }
+
+  function _glDisableVertexAttribArray(index) {
+      var cb = GL.currentContext.clientBuffers[index];
+      cb.enabled = false;
+      GLctx.disableVertexAttribArray(index);
+    }
+
+  function _glDrawArrays(mode, first, count) {
+      // bind any client-side buffers
+      GL.preDrawHandleClientVertexAttribBindings(first + count);
+  
+      GLctx.drawArrays(mode, first, count);
+  
+      GL.postDrawHandleClientVertexAttribBindings();
     }
 
   function _glDrawElements(mode, count, type, indices) {
@@ -5727,10 +5874,6 @@ var ASM_CONSTS = {
   function _glGenVertexArrays(n, arrays) {
       __glGenObject(n, arrays, 'createVertexArray', GL.vaos
         );
-    }
-
-  function _glGetAttribLocation(program, name) {
-      return GLctx.getAttribLocation(GL.programs[program], UTF8ToString(name));
     }
 
   function _glGetProgramInfoLog(program, maxLength, length, infoLog) {
@@ -7322,6 +7465,7 @@ function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
 var asmLibraryArg = {
+  "__cxa_throw": ___cxa_throw,
   "_embind_register_bigint": __embind_register_bigint,
   "_embind_register_bool": __embind_register_bool,
   "_embind_register_emval": __embind_register_emval,
@@ -7350,12 +7494,15 @@ var asmLibraryArg = {
   "glCompileShader": _glCompileShader,
   "glCreateProgram": _glCreateProgram,
   "glCreateShader": _glCreateShader,
-  "glDeleteShader": _glDeleteShader,
+  "glDeleteBuffers": _glDeleteBuffers,
+  "glDeleteProgram": _glDeleteProgram,
+  "glDeleteVertexArrays": _glDeleteVertexArrays,
+  "glDisableVertexAttribArray": _glDisableVertexAttribArray,
+  "glDrawArrays": _glDrawArrays,
   "glDrawElements": _glDrawElements,
   "glEnableVertexAttribArray": _glEnableVertexAttribArray,
   "glGenBuffers": _glGenBuffers,
   "glGenVertexArrays": _glGenVertexArrays,
-  "glGetAttribLocation": _glGetAttribLocation,
   "glGetProgramInfoLog": _glGetProgramInfoLog,
   "glGetProgramiv": _glGetProgramiv,
   "glGetShaderInfoLog": _glGetShaderInfoLog,
@@ -7438,6 +7585,9 @@ var stackAlloc = Module["stackAlloc"] = createExportWrapper("stackAlloc");
 var _emscripten_stack_get_current = Module["_emscripten_stack_get_current"] = function() {
   return (_emscripten_stack_get_current = Module["_emscripten_stack_get_current"] = Module["asm"]["emscripten_stack_get_current"]).apply(null, arguments);
 };
+
+/** @type {function(...*):?} */
+var ___cxa_is_pointer_type = Module["___cxa_is_pointer_type"] = createExportWrapper("__cxa_is_pointer_type");
 
 /** @type {function(...*):?} */
 var dynCall_viijii = Module["dynCall_viijii"] = createExportWrapper("dynCall_viijii");
@@ -7910,7 +8060,6 @@ var missingLibrarySymbols = [
   'setImmediateWrapped',
   'clearImmediateWrapped',
   'polyfillSetImmediate',
-  'ExceptionInfo',
   'exception_addRef',
   'exception_decRef',
   '_setNetworkCallback',

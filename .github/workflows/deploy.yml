@@ -54,6 +54,9 @@ jobs:
       working-directory: build
       run: cpack
 
+    - uses: actions/checkout@v3
+      with:
+        clean: false
     - name: "Upload release assets"
       shell: bash
       env:

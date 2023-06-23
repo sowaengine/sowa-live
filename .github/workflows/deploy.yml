@@ -58,6 +58,7 @@ jobs:
       with:
         clean: false
     - name: "Upload release assets"
+      working-directory: ${{github.workspace}}
       shell: bash
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

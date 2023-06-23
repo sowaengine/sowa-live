@@ -25,6 +25,7 @@ jobs:
       with:
         repository: sowaengine/sowa
         ref: develop
+        path: sowa
         
     - name: Setup emscripten
       uses: mymindstorm/setup-emsdk@v11
@@ -41,26 +42,25 @@ jobs:
         cat ${{env.EMSDK}}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
       
     - name: Configure
+      working-directory: sowa
       run: |
         mkdir build
         mkdir package
         cmake -S . -B build -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=${{env.EMSDK}}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
     
     - name: Build
+      working-directory: sowa
       run: |
-        cmake --build ${{github.workspace}}/build --config Release --parallel 4
+        cmake --build build/ --config Release --parallel 4
 
     - name: Package
       shell: bash
-      working-directory: build
+      working-directory: sowa/build
       run: cpack
 
-    - uses: actions/checkout@v3
-      with:
-        clean: false
     - name: "Upload release assets"
       shell: bash
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        hub release edit $(find package/ -maxdepth 1 -type f -printf "-a %p " -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz") -m "" ${GITHUB_REF##*/}
+        hub release edit $(find sowa/package/ -maxdepth 1 -type f -printf "-a %p " -name "*.exe" -o -name "*.zip" -o -name "*.tar.gz") -m "" ${GITHUB_REF##*/}

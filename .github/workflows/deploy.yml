@@ -43,6 +43,7 @@ jobs:
     - name: Configure
       run: |
         mkdir build
+        mkdir package
         cmake -S . -B build -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=${{env.EMSDK}}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
     
     - name: Build
@@ -58,7 +59,6 @@ jobs:
       with:
         clean: false
     - name: "Upload release assets"
-      working-directory: ${{github.workspace}}
       shell: bash
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

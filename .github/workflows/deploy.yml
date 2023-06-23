@@ -26,6 +26,7 @@ jobs:
         repository: sowaengine/sowa
         ref: develop
         path: sowa
+        clean: false
         
     - name: Setup emscripten
       uses: mymindstorm/setup-emsdk@v11

@@ -74,23 +74,18 @@ jobs:
       shell: bash
       working-directory: sowa/build
       run: cpack
-    
-    - name: "Generate package name"
-      id: package-name
-      run: |
-        echo "::set-output name=artifact::$(find sowa/package/ -maxdepth 1 -type f -printf "-a %p " -o -name "*.tar.gz")"
 
     - name: "Upload release assets"
       shell: bash
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        hub release edit ${{ steps.package-name.outputs.artifact }} -m "" ${GITHUB_REF##*/}
+        hub release edit $(find sowa/package/ -maxdepth 1 -type f -printf "-a %p " -o -name "*.tar.gz") -m "" ${GITHUB_REF##*/}
     
     - name: "Upload artifact"
       uses: actions/upload-pages-artifact@v1
       with:
-        path: ${{ steps.package-name.outputs.artifact }}
+        path: $(find sowa/package/ -maxdepth 1 -type f -printf "-a %p " -o -name "*.tar.gz")
   
   deploy:
     environment:

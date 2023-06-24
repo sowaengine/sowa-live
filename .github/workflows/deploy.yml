@@ -91,7 +91,7 @@ jobs:
     - name: "Upload artifact"
       uses: actions/upload-pages-artifact@v1
       with:
-        path: ${{ steps.artifact-name.outputs.path }}
+        path: ${{github.workspace}}/${{ steps.artifact-name.outputs.path }}
   
   deploy:
     environment:

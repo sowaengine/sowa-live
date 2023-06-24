@@ -85,7 +85,7 @@ jobs:
     - name: "Upload artifact"
       uses: actions/upload-pages-artifact@v1
       with:
-        path: $(find sowa/package/ -maxdepth 1 -type f -printf "-a %p " -o -name "*.tar.gz")
+        path: $(find sowa/package/ -maxdepth 1 -type f -printf " %p " -o -name "*.tar.gz")
   
   deploy:
     environment:
